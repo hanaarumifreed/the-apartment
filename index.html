@@ -121,41 +121,35 @@
     camera.position.set(0, 0, 0);
 
     // ── Splat ─────────────────────────────────────────────────────────────────
-    const splat = new SplatMesh({ url: 'Polk Gulch.spz' });
-    scene.add(splat);
-
-    // Simulate loading progress while the splat decodes
-    const loadingEl   = document.getElementById('loading');
-    const barFill     = document.getElementById('loading-bar-fill');
+    const loadingEl    = document.getElementById('loading');
+    const barFill      = document.getElementById('loading-bar-fill');
     const loadingLabel = document.getElementById('loading-label');
 
     let loadProgress = 0;
     let splatReady = false;
 
-    // Tick the bar forward speculatively; Spark doesn't expose fetch progress
+    // Tick the bar forward speculatively while the splat downloads/decodes
     const progressInterval = setInterval(() => {
-      if (splatReady) {
-        clearInterval(progressInterval);
-        return;
-      }
-      loadProgress = Math.min(loadProgress + Math.random() * 4, 88);
+      if (splatReady) { clearInterval(progressInterval); return; }
+      loadProgress = Math.min(loadProgress + Math.random() * 3, 88);
       barFill.style.width = loadProgress + '%';
-    }, 120);
+    }, 150);
 
-    // SplatMesh resolves once the splat is decoded and ready to render
-    splat.waitForReady().then(() => {
+    function onSplatLoaded() {
       splatReady = true;
       clearInterval(progressInterval);
       barFill.style.width = '100%';
-
       setTimeout(() => {
         loadingEl.classList.add('fade-out');
         setTimeout(() => loadingEl.remove(), 900);
       }, 300);
-    }).catch((err) => {
-      console.error('Failed to load splat:', err);
-      loadingLabel.textContent = 'Failed to load';
+    }
+
+    const splat = new SplatMesh({
+      url: 'apartment.spz',
+      onLoad: onSplatLoaded,
     });
+    scene.add(splat);
 
     // ── FPS-style Navigation ───────────────────────────────────────────────────
     // Euler angles for camera orientation (yaw/pitch only, no roll)
