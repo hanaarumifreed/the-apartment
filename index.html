@@ -102,7 +102,7 @@
 
   <script type="module">
     import * as THREE from 'three';
-    import { SplatMesh } from '@sparkjsdev/spark';
+    import { SplatMesh, SplatLoader } from '@sparkjsdev/spark';
 
     // ── Renderer ──────────────────────────────────────────────────────────────
     const renderer = new THREE.WebGLRenderer({ antialias: false });
@@ -120,42 +120,38 @@
     );
     camera.position.set(0, 0, 0);
 
-    // ── Splat ─────────────────────────────────────────────────────────────────
+    // ── Splat Loading ─────────────────────────────────────────────────────────
     const loadingEl    = document.getElementById('loading');
     const barFill      = document.getElementById('loading-bar-fill');
     const loadingLabel = document.getElementById('loading-label');
 
-    let loadProgress = 0;
-    let splatReady = false;
+    const loader = new SplatLoader();
 
-    // Tick the bar forward speculatively while the splat downloads/decodes
-    const progressInterval = setInterval(() => {
-      if (splatReady) { clearInterval(progressInterval); return; }
-      loadProgress = Math.min(loadProgress + Math.random() * 3, 88);
-      barFill.style.width = loadProgress + '%';
-    }, 150);
+    loader.loadAsync('apartment.spz', (event) => {
+      if (event.type === 'progress' && event.lengthComputable) {
+        const pct = (event.loaded / event.total) * 100;
+        barFill.style.width = pct + '%';
+      }
+    })
+    .then((packedSplats) => {
+      const splat = new SplatMesh({ packedSplats });
+      splat.quaternion.set(1, 0, 0, 0);
+      scene.add(splat);
 
-    function onSplatLoaded() {
-      splatReady = true;
-      clearInterval(progressInterval);
       barFill.style.width = '100%';
       setTimeout(() => {
         loadingEl.classList.add('fade-out');
         setTimeout(() => loadingEl.remove(), 900);
       }, 300);
-    }
-
-    const splat = new SplatMesh({
-      url: 'apartment.spz',
-      onLoad: onSplatLoaded,
+    })
+    .catch((err) => {
+      console.error('Failed to load splat:', err);
+      loadingLabel.textContent = 'Failed to load';
     });
-    scene.add(splat);
 
-    // ── FPS-style Navigation ───────────────────────────────────────────────────
-    // Euler angles for camera orientation (yaw/pitch only, no roll)
+    // ── FPS-style Navigation ──────────────────────────────────────────────────
     const euler = new THREE.Euler(0, 0, 0, 'YXZ');
 
-    // --- Mouse drag to look ---
     let isDragging = false;
     let lastX = 0;
     let lastY = 0;
@@ -178,12 +174,10 @@
 
       euler.y -= dx * LOOK_SPEED;
       euler.x -= dy * LOOK_SPEED;
-      // Clamp pitch so you can't flip upside-down
       euler.x = Math.max(-Math.PI * 0.48, Math.min(Math.PI * 0.48, euler.x));
       camera.quaternion.setFromEuler(euler);
     });
 
-    // Touch drag to look (mobile)
     let lastTouchX = 0;
     let lastTouchY = 0;
 
@@ -208,17 +202,14 @@
       }
     }, { passive: true });
 
-    // --- Scroll to move forward/backward ---
     const SCROLL_SPEED = 0.012;
     const forward = new THREE.Vector3();
 
     window.addEventListener('wheel', (e) => {
-      // Get the direction the camera is facing
       forward.set(0, 0, -1).applyQuaternion(camera.quaternion);
       camera.position.addScaledVector(forward, -e.deltaY * SCROLL_SPEED);
     }, { passive: true });
 
-    // --- WASD / arrow keys for finer movement ---
     const keys = {};
     window.addEventListener('keydown', (e) => { keys[e.code] = true; });
     window.addEventListener('keyup',   (e) => { keys[e.code] = false; });
