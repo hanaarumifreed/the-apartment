@@ -125,6 +125,14 @@
     const barFill      = document.getElementById('loading-bar-fill');
     const loadingLabel = document.getElementById('loading-label');
 
+    function dismissLoader() {
+      barFill.style.width = '100%';
+      setTimeout(() => {
+        loadingEl.classList.add('fade-out');
+        setTimeout(() => loadingEl.remove(), 900);
+      }, 300);
+    }
+
     const loader = new SplatLoader();
 
     loader.loadAsync('apartment.spz', (event) => {
@@ -134,15 +142,15 @@
       }
     })
     .then((packedSplats) => {
-      const splat = new SplatMesh({ packedSplats });
+      const splat = new SplatMesh({
+        packedSplats,
+        onLoad: dismissLoader,
+      });
       splat.quaternion.set(1, 0, 0, 0);
       scene.add(splat);
 
-      barFill.style.width = '100%';
-      setTimeout(() => {
-        loadingEl.classList.add('fade-out');
-        setTimeout(() => loadingEl.remove(), 900);
-      }, 300);
+      // Fallback: if onLoad never fires, dismiss after 3 seconds
+      setTimeout(dismissLoader, 3000);
     })
     .catch((err) => {
       console.error('Failed to load splat:', err);
